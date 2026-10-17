@@ -8,7 +8,7 @@ on:
       - tools/build_124e_candidate.py
       - tests/training-day-124d.test.cjs
       - tests/ai-lineups-124e.test.cjs
-      - .github/workflows/validate-124d.yml
+      - .github/workflows/validate-124e.yml
       - tools/build_124b_candidate.py
       - tests/world-save-124b.test.cjs
       - tests/load-career-124c.test.cjs
