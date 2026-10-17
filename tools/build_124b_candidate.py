@@ -45,9 +45,9 @@ ALIAS_NEW = ALIAS_ANCHOR + """
     };"""
 RESTORE_OLD = "            const p = byId.get(id) || FD.getPlayer(id);"
 RESTORE_NEW = """            // Fresh byId contains every current player. No second 20k-player scan
-            // for a retired/unmatched saved ID; aliases still take precedence.
+            // for a retired/unmatched saved ID; direct IDs retain precedence; alias fallback remains exact.
             const resolved124c = FD.resolvePlayerIdAlias124c?.(id) ?? id;
-            const p = byId.get(resolved124c) || byId.get(id);"""
+            const p = byId.get(id) || byId.get(resolved124c);"""
 
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
