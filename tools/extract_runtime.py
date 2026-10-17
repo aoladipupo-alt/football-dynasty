@@ -30,11 +30,11 @@ with ZipFile(archive) as z:
     }
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     candidates = [e for e in entries if PurePosixPath(e["path"]).suffix.lower() in extensions]
-    candidates.sort(key=lambda e: (PurePosixPath(e["path"]).suffix.lower() not in {".js", ".html", ".py"}, -e["bytes"]))
+    candidates.sort(key=lambda e: (PurePosixPath(e["path"]).suffix.lower() != ".html", PurePosixPath(e["path"]).suffix.lower() not in {".js", ".py"}, -e["bytes"]))
     selected = candidates[:50]
     total = 0
     for entry in selected:
-        if total + entry["bytes"] > 14000000:
+        if total + entry["bytes"] > 30000000:
             continue
         data = z.read(entry["path"])
         try:
