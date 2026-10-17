@@ -1,0 +1,43 @@
+name: 1.24b Archive Inspection (No Deployment)
+on:
+  push:
+    branches:
+      - work/1.24b-career-performance
+    paths:
+      - tools/extract_runtime.py
+      - .github/workflows/inspect-runtime.yml
+      - football-dynasty-site.zip
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm Python extractor compiles
+        run: python3 -m py_compile tools/extract_runtime.py
+      - name: Inspect archived runtime without altering release
+        run: python3 tools/extract_runtime.py
+      - name: Summarize performance-relevant source paths
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,re
+          from pathlib import Path
+          base=Path("inspection/runtime")
+          patterns={"serialization":r"JSON\.stringify|JSON\.parse","browser_storage":r"localStorage|indexedDB","sim_loop":r"simulate|advanceDay|nextDay|seasonEnd|youthAcademy"}
+          for file in base.rglob("*"):
+              if not file.is_file() or file.suffix.lower() not in {".js",".mjs",".html"}: continue
+              source=file.read_text(encoding="utf-8",errors="replace")
+              findings={label:len(re.findall(pattern,source,re.I)) for label,pattern in patterns.items()}
+              if any(findings.values()): print(f"{file}: {findings}")
+          PY
+      - name: Upload source inspection artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-dynasty-runtime-inspection
+          path: inspection/
+          retention-days: 7
