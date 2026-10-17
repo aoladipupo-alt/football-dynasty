@@ -2,6 +2,8 @@
 
 A browser-based football management simulation.
 
+**[Play Football Dynasty](https://aoladipupo-alt.github.io/football-dynasty/)**
+
 ## Release
 
 The 1.23f publishing package contains the 1.23b game engine and 1.23d web launcher. The 414 game files are unchanged.
