@@ -1,0 +1,61 @@
+name: Deploy Football Dynasty 1.23f from verified game archive
+on:
+  push:
+    branches: [main]
+    paths:
+      - football-dynasty-site.zip
+      - .github/workflows/deploy-pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: football-dynasty-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Verify uploaded game ZIP checksum
+        shell: bash
+        run: |
+          echo "0c04fa78e2e607d4d3e12d62921cec99b70ee0e2aad5825ab57c71d2d4596f3a  football-dynasty-site.zip" | sha256sum --check --status
+      - name: Unpack website to deployment directory
+        shell: bash
+        run: |
+          mkdir -p _site
+          python3 - <<'PYUNZIP'
+          from pathlib import Path
+          from zipfile import ZipFile
+          z=ZipFile('football-dynasty-site.zip')
+          root=Path('_site').resolve()
+          for i in z.infolist():
+              p=(root / i.filename).resolve()
+              if not p.is_relative_to(root):
+                  raise RuntimeError('Unsafe path in site ZIP: ' + i.filename)
+              if i.is_dir():
+                  p.mkdir(parents=True,exist_ok=True)
+              else:
+                  p.parent.mkdir(parents=True,exist_ok=True)
+                  p.write_bytes(z.read(i))
+          PYUNZIP
+      - name: Verify actual engine, player cache, assets, and relative paths
+        run: python3 _site/scripts/verify-static-release.py
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - name: Publish site
+        id: deployment
+        uses: actions/deploy-pages@v4
