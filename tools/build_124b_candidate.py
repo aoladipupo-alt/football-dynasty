@@ -29,6 +29,26 @@ NEW = """            // 1.24b: resolve each youth ID once; normalization still r
                 return p ? { ...p, positions:[...(p.positions||[])], attributes:{...(p.attributes||{})}, development:{...(p.development||{})} } : y;
             });"""
 
+
+# 1.24c: avoid full-roster fallback searches for old retired/orphan save IDs.
+# The restore routine already owns an up-to-date by-ID Map. Exposing the exact
+# alias chain lets it preserve getPlayer's preferred alias handling in O(1).
+ALIAS_ANCHOR = "    FD.addPlayerIdAlias = (fromId, toId) => { if (fromId && toId && fromId !== toId) playerIdAliases.set(fromId, toId); };"
+ALIAS_NEW = ALIAS_ANCHOR + """
+    // 1.24c: expose alias resolution for bulk save restores; same eight-hop guard
+    // as getPlayer(), which still handles interactive/individual lookups.
+    FD.resolvePlayerIdAlias124c = id => {
+        let resolved = id, guard = 0;
+        while (playerIdAliases.has(resolved) && guard++ < 8)
+            resolved = playerIdAliases.get(resolved);
+        return resolved;
+    };"""
+RESTORE_OLD = "            const p = byId.get(id) || FD.getPlayer(id);"
+RESTORE_NEW = """            // Fresh byId contains every current player. No second 20k-player scan
+            // for a retired/unmatched saved ID; aliases still take precedence.
+            const resolved124c = FD.resolvePlayerIdAlias124c?.(id) ?? id;
+            const p = byId.get(resolved124c) || byId.get(id);"""
+
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -50,7 +70,14 @@ def build(source: Path, output: Path, comparison_dir: Path):
             raise RuntimeError("Unexpected baseline engine: refusing an unsafe patch")
         patched = original.replace(OLD, NEW)
         if patched.count(NEW) != 1:
-            raise RuntimeError("Patch assertion failed")
+            raise RuntimeError("Youth save patch assertion failed")
+        if original.count(ALIAS_ANCHOR) != 1 or original.count(RESTORE_OLD) != 1:
+            raise RuntimeError("Unexpected alias or restore routine: refusing performance patch")
+        if "resolvePlayerIdAlias124c" in original:
+            raise RuntimeError("Already patched alias resolver")
+        patched = patched.replace(ALIAS_ANCHOR, ALIAS_NEW).replace(RESTORE_OLD, RESTORE_NEW)
+        if patched.count(ALIAS_NEW) != 1 or patched.count(RESTORE_NEW) != 1:
+            raise RuntimeError("Career loading patch assertion failed")
         (comparison_dir / "primary-before.js").write_text(original, encoding="utf-8")
         (comparison_dir / "primary-after.js").write_text(patched, encoding="utf-8")
         patched_bytes = patched.encode("utf-8")
