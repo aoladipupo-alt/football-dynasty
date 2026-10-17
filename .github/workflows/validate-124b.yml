@@ -1,0 +1,59 @@
+name: 1.24b Candidate Regression (No Deployment)
+
+on:
+  push:
+    branches:
+      - work/1.24b-career-performance
+    paths:
+      - tools/build_124b_candidate.py
+      - tests/world-save-124b.test.cjs
+      - .github/workflows/validate-124b.yml
+      - football-dynasty-site.zip
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check patcher syntax
+        run: python3 -m py_compile tools/build_124b_candidate.py
+      - name: Build isolated 1.24b candidate
+        run: python3 tools/build_124b_candidate.py
+      - name: Check engine syntax and compare world-save behavior
+        shell: bash
+        run: |
+          node --check dist/inspection/primary-before.js
+          node --check dist/inspection/primary-after.js
+          node tests/world-save-124b.test.cjs dist/inspection/primary-before.js dist/inspection/primary-after.js
+      - name: Extract candidate site without overwriting published archive
+        run: |
+          mkdir -p _site
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          root=Path('_site').resolve()
+          with ZipFile('dist/football-dynasty-site-1.24b-candidate.zip') as z:
+              for item in z.infolist():
+                  output=(root/item.filename).resolve()
+                  if not output.is_relative_to(root):
+                      raise RuntimeError(f'Unsafe ZIP path: {item.filename}')
+                  if item.is_dir():
+                      output.mkdir(parents=True,exist_ok=True)
+                  else:
+                      output.parent.mkdir(parents=True,exist_ok=True)
+                      output.write_bytes(z.read(item))
+          PY
+      - name: Run existing static release preflight
+        run: python3 _site/scripts/verify-static-release.py
+      - name: Store candidate for manual browser testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-dynasty-1.24b-candidate
+          path: |
+            dist/football-dynasty-site-1.24b-candidate.zip
+            dist/inspection/candidate-manifest.json
+          retention-days: 7
