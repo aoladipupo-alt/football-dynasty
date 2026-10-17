@@ -7,6 +7,7 @@ on:
     paths:
       - tools/build_124b_candidate.py
       - tests/world-save-124b.test.cjs
+      - tests/load-career-124c.test.cjs
       - .github/workflows/validate-124b.yml
       - football-dynasty-site.zip
   workflow_dispatch:
@@ -29,6 +30,7 @@ jobs:
           node --check dist/inspection/primary-before.js
           node --check dist/inspection/primary-after.js
           node tests/world-save-124b.test.cjs dist/inspection/primary-before.js dist/inspection/primary-after.js
+          node tests/load-career-124c.test.cjs dist/inspection/primary-before.js dist/inspection/primary-after.js
       - name: Extract candidate site without overwriting published archive
         run: |
           mkdir -p _site
