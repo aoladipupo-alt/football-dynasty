@@ -11,6 +11,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 TARGET = "game/runtime-096g.js"
+MANIFEST = "hosting-manifest-123d.json"
 OLD = """            const liveYouth=[];
             for (const y of youth) { const p=FD.getPlayer(y.id); if(p) liveYouth.push(p); }
             if (liveYouth.length) FD.normalizeIntegerPlayerStats?.(liveYouth);
@@ -52,15 +53,30 @@ def build(source: Path, output: Path, comparison_dir: Path):
             raise RuntimeError("Patch assertion failed")
         (comparison_dir / "primary-before.js").write_text(original, encoding="utf-8")
         (comparison_dir / "primary-after.js").write_text(patched, encoding="utf-8")
+        patched_bytes = patched.encode("utf-8")
+        manifest = json.loads(old_zip.read(MANIFEST))
+        engine_record = manifest["assets"][TARGET]
+        old_bytes = old_zip.read(TARGET)
+        if engine_record["bytes"] != len(old_bytes) or engine_record["sha256"] != digest(old_bytes):
+            raise RuntimeError("Baseline integrity manifest does not match the game engine")
+        engine_record["bytes"] = len(patched_bytes)
+        engine_record["sha256"] = digest(patched_bytes)
+        # Regenerate, never weaken, the existing static release verification.
+        updated = {
+            TARGET: patched_bytes,
+            MANIFEST: (json.dumps(manifest, indent=2) + "\n").encode("utf-8")
+        }
         with ZipFile(output, "w") as new_zip:
             for info in old_zip.infolist():
                 # Preserve per-file compression, names, timestamps and metadata.
-                data = patched.encode("utf-8") if info.filename == TARGET else old_zip.read(info)
+                data = updated.get(info.filename)
+                if data is None:
+                    data = old_zip.read(info)
                 new_zip.writestr(info, data)
     with ZipFile(source) as old_zip, ZipFile(output) as new_zip:
         changed = [name for name in old_zip.namelist()
                    if old_zip.read(name) != new_zip.read(name)]
-        if changed != [TARGET] or new_zip.testzip() is not None:
+        if set(changed) != {TARGET, MANIFEST} or len(changed) != 2 or new_zip.testzip() is not None:
             raise RuntimeError(f"Candidate integrity failure, changed={changed}")
         if len(old_zip.namelist()) != len(new_zip.namelist()):
             raise RuntimeError("Archive member count changed")
