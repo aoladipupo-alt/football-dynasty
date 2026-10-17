@@ -45,6 +45,13 @@ with ZipFile(archive) as z:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(decoded, encoding="utf-8")
         total += len(data)
+    # Integrity manifest and verifier are required for safe candidate repacking.
+    for name in ("hosting-manifest-123d.json", "scripts/verify-static-release.py"):
+        data = z.read(name)
+        out = target / name
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(data)
+        total += len(data)
     print(f"Archive files: {len(entries)}; candidate text files: {len(candidates)}; extraction total: {total}")
     for entry in sorted(candidates, key=lambda x: -x["bytes"])[:30]:
         print(f'{entry["bytes"]:>10} {entry["path"]}')
