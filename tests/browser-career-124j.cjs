@@ -175,6 +175,13 @@ async function run(){
    const diag=await Promise.race([
      page.evaluate(()=>({visible:(document.querySelector('#app')?.innerText||'').slice(0,1200),
        storageKeys:Object.keys(localStorage).filter(k=>/fd-save-[12]-fd-(career-time|manager-club)-v1/.test(k)),
+       storageSummary:(()=>{
+         const entries=Object.keys(localStorage).map(key=>({
+           key,chars:(localStorage.getItem(key)||'').length
+         })).sort((a,b)=>b.chars-a.chars);
+         return {entries:entries.slice(0,16),totalChars:entries.reduce((n,x)=>n+x.chars+x.key.length,0),
+           allKeys:entries.length};
+       })(),
        databaseStatus:window.FD?.databaseStatus,
        loadMetrics:window.__FD_CAREER_LOAD_METRICS_122V,
        worldReady:window.__FD_CAREER_WORLD_READY_095B})).catch(x=>({evalError:String(x)})),
