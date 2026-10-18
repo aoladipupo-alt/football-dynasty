@@ -16,6 +16,7 @@ on:
       - tests/calendar-cups-124g.test.cjs
       - tests/transfer-replay-124h.test.cjs
       - tests/shadow-cache-124i.test.cjs
+      - tests/roster-normalizer-124i.test.cjs
       - tests/career-footprint-124h.test.cjs
       - diagnostics/career-footprint-124h.js
       - .github/workflows/validate-124i.yml
@@ -69,6 +70,7 @@ jobs:
           node tests/calendar-cups-124g.test.cjs dist/inspection-124g/primary-before.js dist/inspection-124g/primary-after.js
           node tests/transfer-replay-124h.test.cjs dist/inspection-124h/primary-before.js dist/inspection-124h/primary-after.js
           node tests/shadow-cache-124i.test.cjs dist/inspection-124i/primary-before.js dist/inspection-124i/primary-after.js
+          node tests/roster-normalizer-124i.test.cjs dist/inspection-124i/primary-before.js dist/inspection-124i/primary-after.js
           node --check diagnostics/career-footprint-124h.js
           node tests/career-footprint-124h.test.cjs diagnostics/career-footprint-124h.js
       - name: Extract candidate safely for static release validation
