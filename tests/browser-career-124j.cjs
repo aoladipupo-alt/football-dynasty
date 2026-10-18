@@ -124,6 +124,51 @@ async function run(){
    const reopened2=await continueSlot(2);
    assert.deepEqual(reopened2,secondAdvanced,'Reload changed second career');
    console.log('PASS both careers survive full browser page reload');
+
+   // Simulate competitive matchdays in the SECOND disposable career, explicitly
+   // opting into automatic user matches and deadline passage. The first career
+   // must remain unchanged despite substantial world simulation in the second.
+   const beforeMatch1=await read(1),beforeMatch2=await read(2);
+   await page.locator('.continue-menu > summary').click();
+   await page.locator('#sim-auto-matches-121k').check();
+   await page.locator('#sim-auto-deadlines-121k').check();
+   await page.locator('#sim-pause-important-121k').uncheck();
+   const matchTarget='2026-08-18';
+   await page.locator('#continue-date').fill(matchTarget);
+   const simStarted=Date.now();
+   await page.locator('[data-continue-mode="date"]').click();
+   console.log('BEGIN full browser fixture simulation to '+matchTarget);
+   await page.waitForFunction(({target})=>{
+     const raw=localStorage.getItem('fd-save-2-fd-career-time-v1');
+     if(!raw)return false;
+     try{return JSON.parse(raw).date>=target;}catch{return false;}
+   },{target:matchTarget},{timeout:240000});
+   await page.waitForFunction(()=>!document.querySelector('#continue-stop'),null,{timeout:60000});
+   await page.waitForFunction(()=>{
+     try{
+       const saved=JSON.parse(localStorage.getItem('fd-save-2-fd-match-saves-v3')||'{}');
+       return Object.values(saved).some(m=>m?.finished===true);
+     }catch{return false;}
+   },null,{timeout:30000});
+   const played=await read(2);
+   const finished=Object.values(played.matches).filter(m=>m?.finished===true);
+   assert(played.time.date>=matchTarget,'Fixture simulation ended before target');
+   assert(finished.length>=1,'Auto-play did not persist any match results');
+   assert(finished.every(m=>Number.isFinite(Number(m.homeGoals))&&
+     Number.isFinite(Number(m.awayGoals))&&Number(m.homeGoals)>=0&&Number(m.awayGoals)>=0),
+     'Saved scores must be non-negative numbers');
+   assert.deepEqual(await read(1),beforeMatch1,'Fixture simulation in slot 2 changed slot 1');
+   console.log('PASS competitive fixtures auto-simulated and saved: '+finished.length+
+     ' completed user matches, '+(Date.now()-simStarted)+'ms');
+   await page.reload({waitUntil:'domcontentloaded',timeout:45000});
+   const matchGate=page.locator('#device-gate [data-device="pc"]');
+   if(await matchGate.isVisible())await matchGate.click();
+   await page.locator('.save-slot-grid [data-load-slot="2"]').waitFor({timeout:90000});
+   const persistedMatch=await continueSlot(2);
+   assert.deepEqual(persistedMatch,played,'Full reload changed completed fixture scores or date');
+   assert.deepEqual(await read(1),beforeMatch1,'Post-match reload changed other career');
+   console.log('PASS match results and fixture date survive browser reload without cross-slot contamination');
+
    if(errors.length||consoleErrors.length)throw Error('Browser errors: '+[...errors,...consoleErrors].slice(-6).join(' | '));
    console.log('PASS no browser errors during calendar advance and slot switching');
  } catch(e) {
