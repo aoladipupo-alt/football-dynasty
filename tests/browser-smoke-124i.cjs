@@ -79,7 +79,7 @@ async function run(){
   try {
     await page.locator('.app-shell .topbar').waitFor({timeout:45000});
   } catch (error) {
-    const diagnostic=await page.evaluate(()=>({
+    const diagnostic=await Promise.race([page.evaluate(()=>({
       title:document.title,
       appText:(document.querySelector('#app')?.innerText||'').slice(0,700),
       bootText:(document.querySelector('#boot-status')?.innerText||'').slice(0,250),
@@ -90,9 +90,13 @@ async function run(){
       loadTrace:window.__FD_CAREER_LOAD_DETAIL_122V||null,
       worldReady:window.__FD_CAREER_WORLD_READY_095B ?? null,
       dbStatus:window.FD?.databaseStatus||null
-    })).catch(e=>({diagnosticError:String(e)}));
+    })).catch(e=>({diagnosticError:String(e)})),
+      new Promise(resolve=>setTimeout(()=>resolve({diagnosticTimeout:'Browser main thread not responding'}),8000))]);
     console.error('BROWSER CAREER REOPEN DIAGNOSTICS',JSON.stringify({diagnostic,jsErrors:jsErrors.slice(0,8)}));
-    await page.screenshot({path:'dist/inspection-124i/browser-reload-failure.png'}).catch(()=>{});
+    await Promise.race([
+      page.screenshot({path:'dist/inspection-124i/browser-reload-failure.png'}).catch(()=>{}),
+      new Promise(resolve=>setTimeout(resolve,5000))
+    ]);
     throw error;
   }
   assert.equal(await page.evaluate(()=>JSON.parse(
@@ -106,4 +110,4 @@ async function run(){
   await browser.close();
  }
 }
-run().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
+run().catch(e=>{console.error(e.stack||e);process.exit(1);});
