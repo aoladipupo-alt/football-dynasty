@@ -1,0 +1,80 @@
+name: 1.24k IndexedDB Vault and Multi-Career Browser Regression (No Deployment)
+
+on:
+  push:
+    branches: [work/1.24b-career-performance]
+    paths:
+      - tests/browser-career-124j.cjs
+      - tests/career-vault-124k.test.cjs
+      - game/durable-career-vault-124k.js
+      - .github/workflows/validate-124k-browser.yml
+      - tools/build_124i_candidate.py
+      - tools/build_124j_candidate.py
+      - tools/build_124k_candidate.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build cumulative performance candidate (never publish)
+        run: |
+          python3 tools/build_124b_candidate.py
+          python3 tools/build_124d_candidate.py
+          python3 tools/build_124e_candidate.py
+          python3 tools/build_124f_candidate.py
+          python3 tools/build_124g_candidate.py
+          python3 tools/build_124h_candidate.py
+          python3 tools/build_124i_candidate.py
+          python3 tools/build_124j_candidate.py
+          python3 tools/build_124k_candidate.py
+      - name: Unpack temporary site under sandbox and verify links/hashes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          root=Path('_site').resolve()
+          with ZipFile('dist/football-dynasty-site-1.24k-vault-candidate.zip') as z:
+            if z.testzip() is not None: raise RuntimeError('Archive failed CRC check')
+            for entry in z.infolist():
+              path=(root/entry.filename).resolve()
+              if not path.is_relative_to(root): raise RuntimeError('Unsafe ZIP entry')
+              if entry.is_dir(): path.mkdir(parents=True,exist_ok=True)
+              else:
+                path.parent.mkdir(parents=True,exist_ok=True)
+                path.write_bytes(z.read(entry))
+          PY
+          python3 _site/scripts/verify-static-release.py
+      - name: Set up disposable Chromium test dependency
+        shell: bash
+        run: |
+          npm install --no-save --no-package-lock playwright-core@1.56.1
+          if ! command -v google-chrome && ! command -v google-chrome-stable && ! command -v chromium; then
+            npx --yes playwright@1.56.1 install chromium
+          fi
+      - name: Browser integration - checkpoint vault plus prior calendar and save tests
+        shell: bash
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory _site >/tmp/football-dynasty-test-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8765/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node tests/player-storage-124j.test.cjs dist/inspection-124j/primary-before.js dist/inspection-124j/primary-after.js
+          node tests/career-vault-124k.test.cjs
+          node tests/browser-career-124j.cjs
+      - name: Upload temporary browser diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-reopen-debug
+          path: dist/inspection-124i/browser-reload-failure.png
+          if-no-files-found: ignore
+          retention-days: 3
