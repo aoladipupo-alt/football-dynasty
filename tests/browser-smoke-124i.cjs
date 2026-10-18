@@ -76,7 +76,25 @@ async function run(){
   await page.locator('.save-slot-grid [data-load-slot="1"]')
     .waitFor({timeout:90000});
   await page.locator('.save-slot-grid [data-load-slot="1"]').click();
-  await page.locator('.app-shell .topbar').waitFor({timeout:120000});
+  try {
+    await page.locator('.app-shell .topbar').waitFor({timeout:45000});
+  } catch (error) {
+    const diagnostic=await page.evaluate(()=>({
+      title:document.title,
+      appText:(document.querySelector('#app')?.innerText||'').slice(0,700),
+      bootText:(document.querySelector('#boot-status')?.innerText||'').slice(0,250),
+      saveManagerVisible:Boolean(document.querySelector('.save-slot-grid')),
+      selectorVisible:Boolean(document.querySelector('.club-grid')),
+      shellVisible:Boolean(document.querySelector('.app-shell')),
+      slot1Club:localStorage.getItem('fd-save-1-fd-manager-club-v1'),
+      loadTrace:window.__FD_CAREER_LOAD_DETAIL_122V||null,
+      worldReady:window.__FD_CAREER_WORLD_READY_095B ?? null,
+      dbStatus:window.FD?.databaseStatus||null
+    })).catch(e=>({diagnosticError:String(e)}));
+    console.error('BROWSER CAREER REOPEN DIAGNOSTICS',JSON.stringify({diagnostic,jsErrors:jsErrors.slice(0,8)}));
+    await page.screenshot({path:'dist/inspection-124i/browser-reload-failure.png'}).catch(()=>{});
+    throw error;
+  }
   assert.equal(await page.evaluate(()=>JSON.parse(
       localStorage.getItem('fd-save-1-fd-manager-club-v1')||'null')),
     chosenClub,'Reloaded career changed club');
