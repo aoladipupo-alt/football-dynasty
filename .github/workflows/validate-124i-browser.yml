@@ -51,7 +51,7 @@ jobs:
           if ! command -v google-chrome && ! command -v google-chrome-stable && ! command -v chromium; then
             npx --yes playwright@1.56.1 install chromium
           fi
-      - name: Browser smoke test: real engine boot and club picker
+      - name: Browser smoke test - real engine boot and club picker
         shell: bash
         run: |
           python3 -m http.server 8765 --bind 127.0.0.1 --directory _site >/tmp/football-dynasty-test-server.log 2>&1 &
