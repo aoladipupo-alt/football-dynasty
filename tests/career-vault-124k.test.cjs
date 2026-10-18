@@ -91,6 +91,25 @@ async function main(){
    return {keys:Object.keys(archive.data).length,club:archive.data['fd-manager-club-v1']};
   });
   assert.equal(one.keys,9);assert.equal(one.club,first.club);
+  await page.locator('[data-delete-slot="1"]').waitFor({timeout:85000});
+  page.once('dialog',dialog=>dialog.accept());
+  await page.locator('[data-delete-slot="1"]').click();
+  await page.waitForFunction(()=>localStorage.getItem('fd-save-1-fd-manager-club-v1')===null,null,{timeout:40000});
+  const deleted=await page.evaluate(async()=>({
+   first:await window.FDCareerVault124k.readVerified(1),
+   second:await window.FDCareerVault124k.readVerified(2)
+  }));
+  assert.equal(deleted.first,null,'Deleting a career must erase protected vault copies too');
+  assert(deleted.second,'Deleting slot 1 must not erase another protected slot');
+  console.log('PASS confirmed single-career deletion clears its vault records but preserves other slots');
+  page.once('dialog',dialog=>dialog.accept('DELETE ALL'));
+  await page.locator('#delete-all-careers-121j').click();
+  await page.waitForFunction(()=>localStorage.getItem('fd-save-1-fd-manager-club-v1')===null,null,{timeout:40000});
+  const erased=await page.evaluate(async()=>[
+   await window.FDCareerVault124k.readVerified(1),await window.FDCareerVault124k.readVerified(2)
+  ]);
+  assert.deepEqual(erased,[null,null],'Delete All must erase all protected IndexedDB checkpoints');
+  console.log('PASS DELETE ALL removes IndexedDB vault records and local career data');
   assert.equal(problems.length,0,'Uncaught browser errors: '+problems.join(' | '));
   console.log('PASS verified prior checkpoint export and no browser errors');
  }finally{await context.close();await browser.close();}
