@@ -29,6 +29,13 @@ CACHE_PATCH = CACHE_ANCHOR + """
 
 HANDOFF_ANCHOR = """        if(!reuseLoaded){flushMatchSaves();flushActiveSlotMeta096z();}
         activeSaveSlot = requestedSlot;"""
+# The core roster loader and the later career-management module are two
+# separate IIFEs. Fresh-save migrations used a private core helper without
+# defining it in the career module, so clicking Continue raised ReferenceError.
+CORE_NORMALIZER = "    function normalizeRosterName(value) {"
+CORE_NORMALIZER_END = "    function rosterOverrides() {"
+CAREER_REPAIR = "    function repairDataOnlyProspectsSave096e() {"
+
 HANDOFF_PATCH = """        if(!reuseLoaded){flushMatchSaves();flushActiveSlotMeta096z();}
         // Keep fast same-session resumes free of unnecessary re-encoding.
         // Forced reloads and new careers must drop the old archive reference,
@@ -56,6 +63,18 @@ def patch(source: str) -> str:
     source=source.replace(HANDOFF_ANCHOR,HANDOFF_PATCH)
     if source.count("releaseShadowSaveBuffers124i();")!=1:
         raise RuntimeError("Invalid cache reset placement")
+    # Carry over the exact, already-shipped name-normalization implementation
+    # into the distinct career-manager closure. No new migration rules.
+    if source.count(CORE_NORMALIZER)!=1 or source.count(CAREER_REPAIR)!=1:
+        raise RuntimeError("Unexpected normalizer or career repair layout")
+    start=source.index(CORE_NORMALIZER)
+    end=source.index(CORE_NORMALIZER_END,start)
+    helper=source[start:end]
+    if not helper.rstrip().endswith("}") or len(helper)>1000 or len(helper)<180:
+        raise RuntimeError("Unexpected core normalizer implementation")
+    source=source.replace(CAREER_REPAIR,helper+CAREER_REPAIR)
+    if source.count(CORE_NORMALIZER)!=2:
+        raise RuntimeError("Failed to provide career-scoped normalizer")
     return source
 
 def build(source: Path, output: Path, inspection: Path) -> dict:
