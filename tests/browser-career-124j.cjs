@@ -60,6 +60,9 @@ async function run(){
  async function advance(mode,slot,days){
    const before=await read(slot);
    await page.locator('.continue-menu > summary').click();
+   // Important inbox entries are a deliberate, user-configurable pause condition.
+   // Disable only for this disposable automated multi-day progression test.
+   if(mode==='week')await page.locator('#sim-pause-important-121k').uncheck();
    await page.locator('[data-continue-mode="'+mode+'"]').click();
    // One-day run is synchronous after world hydration; week is batched.
    await page.waitForFunction(({slot,date})=>{
@@ -73,7 +76,7 @@ async function run(){
    await page.locator('.app-shell .topbar').waitFor({timeout:30000});
    const after=await read(slot);
    const goal=tomorrow(before.time.date,days);
-   assert(after.time.date>=goal || (mode==='week'&&after.time.date>before.time.date),
+   assert(after.time.date===goal,
      'Calendar did not advance: '+before.time.date+' → '+after.time.date);
    assert.equal(after.club,before.club,'Advancement changed manager club');
    console.log('PASS '+mode+' advancement, slot '+slot+': '+before.time.date+' -> '+after.time.date);
