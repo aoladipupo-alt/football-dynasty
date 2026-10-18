@@ -130,6 +130,29 @@
   async function checkpointLocal(slot,storage=localStorage){
     return checkpoint(slot,snapshotLocal(slot,storage));
   }
+  async function clearSlot(slot){
+    requireSlot(slot);
+    const db=await open();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction(STORE,'readwrite'),store=tx.objectStore(STORE);
+      store.delete(slot+':head');store.delete(slot+':previous');
+      tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error||Error('Protected checkpoint deletion aborted'));
+      tx.onerror=()=>reject(tx.error||Error('Protected checkpoint deletion failed'));
+    });
+    if(await readVerified(slot))throw Error('Protected checkpoint deletion could not be verified');
+    return true;
+  }
+  async function clearAll(){
+    const db=await open();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).clear();
+      tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error||Error('Protected checkpoint reset aborted'));
+      tx.onerror=()=>reject(tx.error||Error('Protected checkpoint reset failed'));
+    });
+    for(let slot=1;slot<=5;slot++)if(await readVerified(slot))
+      throw Error('Protected career reset was not verified');
+    return true;
+  }
   async function exportPortable(slot,validator){
     const verified=await readVerified(slot);
     if(!verified)throw Error('This career has no protected checkpoint');
@@ -155,5 +178,5 @@
     return backup;
   }
   window.FDCareerVault124k=Object.freeze({open,checkpoint,checkpointLocal,readVerified,
-    snapshotLocal,exportPortable,fields:FIELDS,version:1});
+    snapshotLocal,exportPortable,clearSlot,clearAll,fields:FIELDS,version:1});
 })();
