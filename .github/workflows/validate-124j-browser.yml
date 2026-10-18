@@ -7,6 +7,7 @@ on:
       - tests/browser-career-124j.cjs
       - .github/workflows/validate-124j-browser.yml
       - tools/build_124i_candidate.py
+      - tools/build_124j_candidate.py
   workflow_dispatch:
 
 permissions:
@@ -27,13 +28,14 @@ jobs:
           python3 tools/build_124g_candidate.py
           python3 tools/build_124h_candidate.py
           python3 tools/build_124i_candidate.py
+          python3 tools/build_124j_candidate.py
       - name: Unpack temporary site under sandbox and verify links/hashes
         run: |
           python3 - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
           root=Path('_site').resolve()
-          with ZipFile('dist/football-dynasty-site-1.24i-candidate.zip') as z:
+          with ZipFile('dist/football-dynasty-site-1.24j-candidate.zip') as z:
             if z.testzip() is not None: raise RuntimeError('Archive failed CRC check')
             for entry in z.infolist():
               path=(root/entry.filename).resolve()
@@ -61,6 +63,7 @@ jobs:
             if curl -fsS http://127.0.0.1:8765/ >/dev/null; then break; fi
             sleep 1
           done
+          node tests/player-storage-124j.test.cjs dist/inspection-124j/primary-before.js dist/inspection-124j/primary-after.js
           node tests/browser-career-124j.cjs
       - name: Upload temporary browser diagnostics on failure
         if: failure()
