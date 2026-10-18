@@ -28,8 +28,9 @@ async function run(){
  });
  const page=await context.newPage();
  page.setDefaultTimeout(90000);
- const jsErrors=[];
+ const jsErrors=[],consoleErrors=[];
  page.on('pageerror',error=>jsErrors.push(String(error)));
+ page.on('console',message=>{if(message.type()==='error'||message.type()==='warning')consoleErrors.push(message.text());});
  try{
   const hub=await page.goto(base+'/',{waitUntil:'domcontentloaded',timeout:30000});
   assert.equal(hub.status(),200,'Career hub route failed');
@@ -92,7 +93,7 @@ async function run(){
       dbStatus:window.FD?.databaseStatus||null
     })).catch(e=>({diagnosticError:String(e)})),
       new Promise(resolve=>setTimeout(()=>resolve({diagnosticTimeout:'Browser main thread not responding'}),8000))]);
-    console.error('BROWSER CAREER REOPEN DIAGNOSTICS',JSON.stringify({diagnostic,jsErrors:jsErrors.slice(0,8)}));
+    console.error('BROWSER CAREER REOPEN DIAGNOSTICS',JSON.stringify({diagnostic,jsErrors:jsErrors.slice(0,8),consoleErrors:consoleErrors.slice(-12)}));
     await Promise.race([
       page.screenshot({path:'dist/inspection-124i/browser-reload-failure.png'}).catch(()=>{}),
       new Promise(resolve=>setTimeout(resolve,5000))
