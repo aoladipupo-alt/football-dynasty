@@ -1,0 +1,92 @@
+name: 1.24h Long-Career Transfer Replay Regression (No Deployment)
+
+on:
+  push:
+    branches: [work/1.24b-career-performance]
+    paths:
+      - tools/build_124d_candidate.py
+      - tools/build_124e_candidate.py
+      - tools/build_124f_candidate.py
+      - tools/build_124g_candidate.py
+      - tools/build_124h_candidate.py
+      - tests/training-day-124d.test.cjs
+      - tests/ai-lineups-124e.test.cjs
+      - tests/continental-124f.test.cjs
+      - tests/calendar-cups-124g.test.cjs
+      - tests/transfer-replay-124h.test.cjs
+      - .github/workflows/validate-124h.yml
+      - tools/build_124b_candidate.py
+      - tests/world-save-124b.test.cjs
+      - tests/load-career-124c.test.cjs
+      - football-dynasty-site.zip
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify candidate-building scripts
+        run: |
+          python3 -m py_compile tools/build_124b_candidate.py
+          python3 -m py_compile tools/build_124d_candidate.py
+          python3 -m py_compile tools/build_124e_candidate.py
+          python3 -m py_compile tools/build_124f_candidate.py
+          python3 -m py_compile tools/build_124g_candidate.py
+          python3 -m py_compile tools/build_124h_candidate.py
+      - name: Build cumulative candidate (1.24b + 1.24c + 1.24d + 1.24e + 1.24f + 1.24g + 1.24h)
+        run: |
+          python3 tools/build_124b_candidate.py
+          python3 tools/build_124d_candidate.py
+          python3 tools/build_124e_candidate.py
+          python3 tools/build_124f_candidate.py
+          python3 tools/build_124g_candidate.py
+          python3 tools/build_124h_candidate.py
+      - name: Validate syntax and real-engine behavior against prior versions
+        run: |
+          node --check dist/inspection/primary-before.js
+          node --check dist/inspection/primary-after.js
+          node --check dist/inspection-124d/primary-after.js
+          node --check dist/inspection-124e/primary-after.js
+          node --check dist/inspection-124f/primary-after.js
+          node --check dist/inspection-124g/primary-after.js
+          node --check dist/inspection-124h/primary-after.js
+          node tests/world-save-124b.test.cjs dist/inspection/primary-before.js dist/inspection/primary-after.js
+          node tests/load-career-124c.test.cjs dist/inspection/primary-before.js dist/inspection/primary-after.js
+          node tests/training-day-124d.test.cjs dist/inspection-124d/primary-before.js dist/inspection-124d/primary-after.js
+          node tests/ai-lineups-124e.test.cjs dist/inspection-124e/primary-before.js dist/inspection-124e/primary-after.js
+          node tests/continental-124f.test.cjs dist/inspection-124f/primary-before.js dist/inspection-124f/primary-after.js
+          node tests/calendar-cups-124g.test.cjs dist/inspection-124g/primary-before.js dist/inspection-124g/primary-after.js
+          node tests/transfer-replay-124h.test.cjs dist/inspection-124h/primary-before.js dist/inspection-124h/primary-after.js
+      - name: Extract candidate safely for static release validation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          root=Path('_site').resolve()
+          with ZipFile('dist/football-dynasty-site-1.24h-candidate.zip') as z:
+              if z.testzip() is not None:
+                  raise ValueError('Candidate ZIP integrity failed')
+              for item in z.infolist():
+                  output=(root/item.filename).resolve()
+                  if not output.is_relative_to(root):
+                      raise ValueError(f'Unsafe ZIP path: {item.filename}')
+                  if item.is_dir():
+                      output.mkdir(parents=True,exist_ok=True)
+                  else:
+                      output.parent.mkdir(parents=True,exist_ok=True)
+                      output.write_bytes(z.read(item))
+          PY
+      - name: Preserve original asset-link and SHA integrity checks
+        run: python3 _site/scripts/verify-static-release.py
+      - name: Upload opt-in candidate, never deploy to live Pages
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-dynasty-1.24h-candidate
+          path: |
+            dist/football-dynasty-site-1.24h-candidate.zip
+            dist/inspection-124h/candidate-manifest.json
+          retention-days: 7
