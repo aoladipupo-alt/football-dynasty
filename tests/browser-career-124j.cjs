@@ -158,8 +158,30 @@ async function run(){
      Number.isFinite(Number(m.awayGoals))&&Number(m.homeGoals)>=0&&Number(m.awayGoals)>=0),
      'Saved scores must be non-negative numbers');
    assert.deepEqual(await read(1),beforeMatch1,'Fixture simulation in slot 2 changed slot 1');
+   const verifiedSave=await page.evaluate(()=>{
+     const raw=JSON.parse(localStorage.getItem('fd-save-2-fd-player-career-state-v1')||'null');
+     const stored=Object.keys(localStorage).map(key=>({key,chars:(localStorage.getItem(key)||'').length}));
+     const totalChars=stored.reduce((n,x)=>n+x.chars+x.key.length,0);
+     const exported=window.FDStablePolish.exportCareer();
+     const checked=window.FDStablePolish.validateBackup(JSON.stringify(exported));
+     const decoded=exported.data['fd-player-career-state-v1'];
+     return {format:raw?.format,compressedChars:JSON.stringify(raw).length,
+       portablePlayers:Object.keys(decoded||{}).length,
+       portableIsObject:!!decoded&&typeof decoded==='object'&&!Array.isArray(decoded)&&!decoded.format,
+       backupValid:checked?.format==='football-dynasty-restored-career',
+       totalChars,notice:(document.querySelector('.sim-notice-121k')?.innerText||'').slice(0,160),
+       warning:document.querySelector('#page .notice.warning')?.innerText||''};
+   });
+   assert.equal(verifiedSave.format,'fd-player-career-lzw-124j','Large player snapshot is not compressed');
+   assert(verifiedSave.portableIsObject&&verifiedSave.portablePlayers>100,
+     'Career export must contain real expanded player records');
+   assert(verifiedSave.backupValid,'Portable career backup failed its own importer validation');
+   assert(!/progress could not be saved/i.test(verifiedSave.warning),'Browser storage quota warning remains');
+   assert(/match auto-played/.test(verifiedSave.notice),'Human match was not auto-played');
+   console.log('PASS compressed on-disk player state and portable uncompressed JSON backup: '+
+     verifiedSave.compressedChars+' player-state chars, '+verifiedSave.totalChars+' total storage chars');
    console.log('PASS competitive fixtures auto-simulated and saved: '+finished.length+
-     ' completed user matches, '+(Date.now()-simStarted)+'ms');
+     ' completed fixture-result records, '+(Date.now()-simStarted)+'ms');
    await page.reload({waitUntil:'domcontentloaded',timeout:45000});
    const matchGate=page.locator('#device-gate [data-device="pc"]');
    if(await matchGate.isVisible())await matchGate.click();
