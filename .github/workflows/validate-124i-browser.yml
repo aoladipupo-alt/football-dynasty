@@ -62,3 +62,11 @@ jobs:
             sleep 1
           done
           node tests/browser-smoke-124i.cjs
+      - name: Upload temporary browser diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-reopen-debug
+          path: dist/inspection-124i/browser-reload-failure.png
+          if-no-files-found: ignore
+          retention-days: 3
