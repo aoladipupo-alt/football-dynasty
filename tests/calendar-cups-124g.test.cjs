@@ -25,7 +25,7 @@ function fixtureInput({leagueCount=400,cupCount=32,scenario='pending',clubCount=
  for(let i=0;i<leagueCount;i++){
   const home='club-'+(i*3%clubCount),away='club-'+((i*3+1)%clubCount);
   const f={id:'league-'+i,date:dates[i%dates.length],competitionId:'league-one',
-   homeClubId:home,awayClubId:away,homeName:home,awayName:away,round:'Round '+i%38};
+   homeClubId:home,awayClubId:away,homeName:home,awayName:away,round:'Round '+(i%38)};
   fixtures.push(f);if(i%8===7)results[f.id]={finished:true,homeGoals:2,awayGoals:1};
  }
  const rounds=['Third Round','Fourth Round','Fifth Round','Quarter-final','Semi-final','Final'];
