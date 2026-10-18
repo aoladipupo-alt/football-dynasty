@@ -42,6 +42,17 @@ UI_NEW="""  // 1.24k phase 1: explicit, verified IndexedDB safety checkpoints.
   });
   bar.append(save,load,recover,protect,protectedExport,input);host.replaceChildren(bar);"""
 
+# Career deletion must also remove protected vault copies. The user has already
+# confirmed deletion, but the UI only proceeds after IndexedDB transaction success.
+DELETE_ALL_EVENT="document.getElementById('delete-all-careers-121j')?.addEventListener('click', () => {"
+DELETE_ALL_EVENT_NEW="document.getElementById('delete-all-careers-121j')?.addEventListener('click', async () => {"
+DELETE_ALL_CALL="            try {\n                deleteAllCareers121j();"
+DELETE_ALL_CALL_NEW="            try {\n                await window.FDCareerVault124k.clearAll();\n                deleteAllCareers121j();"
+DELETE_SLOT_EVENT="document.querySelectorAll('[data-delete-slot]').forEach(b => b.addEventListener('click', () => {"
+DELETE_SLOT_EVENT_NEW="document.querySelectorAll('[data-delete-slot]').forEach(b => b.addEventListener('click', async () => {"
+DELETE_SLOT_CALL="                deleteSaveSlot(slot);\n                renderSaveManager();"
+DELETE_SLOT_CALL_NEW="                try { await window.FDCareerVault124k.clearSlot(slot); deleteSaveSlot(slot); renderSaveManager(); }\n                catch(error) { window.alert('Career could not be erased: '+String(error?.message||error)); }"
+
 def sha(blob): return hashlib.sha256(blob).hexdigest()
 def once(source,old,new,label):
     if source.count(old)!=1 or new in source:
@@ -62,7 +73,14 @@ def build(source,output,script):
             original=old.read(name)
             if record['bytes']!=len(original) or record['sha256']!=sha(original):
                 raise ValueError('Baseline integrity failed: '+name)
-        runtime=once(old.read(RUNTIME).decode(),UI_OLD,UI_NEW,'backup UI').encode()
+        runtime=once(old.read(RUNTIME).decode(),UI_OLD,UI_NEW,'backup UI')
+        for original,replacement,label in (
+            (DELETE_ALL_EVENT,DELETE_ALL_EVENT_NEW,'bulk delete handler'),
+            (DELETE_ALL_CALL,DELETE_ALL_CALL_NEW,'bulk delete action'),
+            (DELETE_SLOT_EVENT,DELETE_SLOT_EVENT_NEW,'slot delete handler'),
+            (DELETE_SLOT_CALL,DELETE_SLOT_CALL_NEW,'slot delete action')):
+            runtime=once(runtime,original,replacement,label)
+        runtime=runtime.encode()
         page=once(old.read(PAGE).decode(),PAGE_ANCHOR,PAGE_NEW,'device loader').encode()
         vault=script.read_bytes()
         if b'FDCareerVault124k' not in vault:raise ValueError('Invalid IndexedDB vault module')
