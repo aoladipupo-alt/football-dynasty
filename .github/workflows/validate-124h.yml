@@ -14,6 +14,8 @@ on:
       - tests/continental-124f.test.cjs
       - tests/calendar-cups-124g.test.cjs
       - tests/transfer-replay-124h.test.cjs
+      - tests/career-footprint-124h.test.cjs
+      - diagnostics/career-footprint-124h.js
       - .github/workflows/validate-124h.yml
       - tools/build_124b_candidate.py
       - tests/world-save-124b.test.cjs
@@ -61,6 +63,8 @@ jobs:
           node tests/continental-124f.test.cjs dist/inspection-124f/primary-before.js dist/inspection-124f/primary-after.js
           node tests/calendar-cups-124g.test.cjs dist/inspection-124g/primary-before.js dist/inspection-124g/primary-after.js
           node tests/transfer-replay-124h.test.cjs dist/inspection-124h/primary-before.js dist/inspection-124h/primary-after.js
+          node --check diagnostics/career-footprint-124h.js
+          node tests/career-footprint-124h.test.cjs diagnostics/career-footprint-124h.js
       - name: Extract candidate safely for static release validation
         run: |
           python3 - <<'PY'
