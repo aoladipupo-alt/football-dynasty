@@ -56,6 +56,31 @@ async function run(){
   assert(!sensitive,'Smoke test should not start/persist a career');
   console.log('PASS no saved career created during startup smoke test');
 
+  // Use a throwaway localStorage profile to verify that a real club career can
+  // be created and then loaded after navigation. Never import user backups.
+  const chosenClub=await page.locator('.club-grid [data-choose-club]').first()
+    .getAttribute('data-choose-club');
+  assert(chosenClub,'No playable club selected');
+  await page.locator('.club-grid [data-choose-club]').first().click();
+  await page.locator('#mission-setup-start').waitFor({timeout:90000});
+  await page.locator('#mission-setup-start').click();
+  await page.locator('.app-shell .topbar').waitFor({timeout:120000});
+  const savedClub=await page.evaluate(()=>JSON.parse(
+    localStorage.getItem('fd-save-1-fd-manager-club-v1')||'null'));
+  assert.equal(savedClub,chosenClub,'Created career saved the wrong club');
+  console.log('PASS create new local career and persist correct club identity');
+
+  await page.reload({waitUntil:'domcontentloaded',timeout:45000});
+  const gate=page.locator('#device-gate [data-device="pc"]');
+  if(await gate.isVisible())await gate.click();
+  await page.locator('.save-slot-grid [data-load-slot="1"]')
+    .waitFor({timeout:90000});
+  await page.locator('.save-slot-grid [data-load-slot="1"]').click();
+  await page.locator('.app-shell .topbar').waitFor({timeout:120000});
+  assert.equal(await page.evaluate(()=>JSON.parse(
+      localStorage.getItem('fd-save-1-fd-manager-club-v1')||'null')),
+    chosenClub,'Reloaded career changed club');
+  console.log('PASS persisted career reopens after browser reload');
   if(jsErrors.length)throw Error('Browser JavaScript errors: '+jsErrors.slice(0,5).join(' | '));
   console.log('PASS no uncaught browser JavaScript exceptions');
  }finally{
