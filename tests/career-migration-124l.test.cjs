@@ -33,6 +33,7 @@ async function main(){
   await page.locator('.app-shell .topbar').waitFor({timeout:100000});
   await page.waitForFunction(()=>!!window.FDCareerVault124k&&!!window.FDShadowCodec121i);
   const coldMs=Date.now()-started;
+  const preMigrationKeys=await page.evaluate(()=>Object.keys(localStorage).filter(k=>k.startsWith('fd-save-')).sort());
   // Test six realistic save formats/payloads without modifying any user's
   // localStorage. Real careers are tested separately by career-vault-124k.
   const migrated=await page.evaluate(async()=>{
@@ -137,8 +138,8 @@ async function main(){
   assert.equal(sustained.invariant[0].date,'2036-07-07');
   assert.equal(sustained.invariant[1].date,'2036-07-07');
   assert(sustained.invariant.every(row=>row.finished===401&&row.transfers===11&&row.youth===11));
-  assert(!sustained.localKeys.some(key=>/^fd-save-[12]-/.test(key)),
-   'Synthetic vault-only slots must not create localStorage records');
+  assert.deepEqual(sustained.localKeys.sort(),preMigrationKeys,
+   'Vault-only synthetic seasons unexpectedly changed localStorage keys');
   console.log('PASS 10 synthetic seasons × two slots, verified matches/transfers/youth, no live localStorage growth');
   const failure=await page.evaluate(async()=>{
    const vault=window.FDCareerVault124k;
