@@ -28,7 +28,9 @@
   function open(){
     if(dbPromise)return dbPromise;
     dbPromise=new Promise((resolve,reject)=>{
-      if(!('indexedDB' in window)){reject(Error('IndexedDB unavailable; no data was changed'));return;}
+      if(!window.indexedDB||typeof window.indexedDB.open!=='function'){
+        reject(Error('IndexedDB unavailable; no data was changed'));return;
+      }
       const request=indexedDB.open(DATABASE,1);
       request.onupgradeneeded=()=>{
         const db=request.result;
@@ -87,13 +89,18 @@
       tx.onerror=()=>{problem=problem||tx.error;};
       const request=store.get(slot+':head');
       request.onsuccess=()=>{
-        const current=request.result;
-        const actual=current?.revision||0;
-        if(actual!==expectedRevision || (current?.sha256||null)!==expectedHash){
-          problem=Error('Career checkpoint changed in another tab; nothing was overwritten');tx.abort();return;
+        try{
+          const current=request.result;
+          const actual=current?.revision||0;
+          if(actual!==expectedRevision || (current?.sha256||null)!==expectedHash){
+            throw Error('Career checkpoint changed in another tab; nothing was overwritten');
+          }
+          if(verifiedPrevious)store.put(verifiedPrevious,slot+':previous');
+          store.put(record,slot+':head');
+        }catch(error){
+          problem=error;
+          try{tx.abort();}catch(_){}
         }
-        if(verifiedPrevious)store.put(verifiedPrevious,slot+':previous');
-        store.put(record,slot+':head');
       };
       request.onerror=()=>{problem=request.error||Error('Unable to read checkpoint head');tx.abort();};
     });
@@ -128,7 +135,7 @@
     return entries;
   }
   async function checkpointLocal(slot,storage=localStorage){
-    return checkpoint(slot,snapshotLocal(slot,storage));
+    return migrateLegacy(slot,storage);
   }
   async function clearSlot(slot){
     requireSlot(slot);
@@ -177,6 +184,106 @@
     if(validator)validator(JSON.stringify(backup));
     return backup;
   }
+
+  // 1.24l: migration reads and validates the original bytes; it never mutates
+  // localStorage. The game must use an explicit cutover barrier before deleting
+  // a legacy payload, because its current readers are synchronous.
+  function verifyLegacyPayload(slot,entries){
+    const copy=safeEntries(slot,entries);
+    const parse=field=>copy[field]===null?null:JSON.parse(copy[field]);
+    const codec=window.FDShadowCodec121i;
+    const players=parse('fd-player-career-state-v1');
+    if(players?.format==='fd-player-career-lzw-124j'){
+      if(typeof players.zip!=='string'||players.zip.length>20000000||!codec?.unzip)
+        throw Error('Compressed player archive cannot be checked; legacy bytes were not changed');
+      const restored=JSON.parse(codec.unzip(players.zip));
+      if(!restored||typeof restored!=='object'||Array.isArray(restored))
+        throw Error('Compressed player archive has no player records');
+    }
+    const world=parse('fd-world-state-v043');
+    if(world?.shadowSidecar121i){
+      const archive=parse('fd-shadow-prospects-v121i');
+      if(archive?.format!=='fd-shadow-sidecar-121i'||
+         typeof archive.zip!=='string'||!codec?.unzip)
+        throw Error('Foreign academy sidecar is missing or unreadable');
+      const unpacked=JSON.parse(codec.unzip(archive.zip));
+      if(!unpacked||typeof unpacked!=='object')
+        throw Error('Foreign academy sidecar is invalid');
+    }
+    if(world?.shadowZip121i && (typeof world.shadowZip121i!=='string'||!codec?.unzip))
+      throw Error('Embedded foreign academy archive is invalid');
+    return copy;
+  }
+  async function migrateLegacy(slot,storage=localStorage,validator){
+    requireSlot(slot);
+    const entries=verifyLegacyPayload(slot,snapshotLocal(slot,storage));
+    const original=canonical(slot,entries);
+    const current=await readVerified(slot);
+    if(current?.source==='head'&&canonical(slot,current.record.entries)===original){
+      if(validator)await exportPortable(slot,validator);
+      return Object.freeze({slot,revision:current.record.revision,alreadyMigrated:true,
+        sha256:current.record.sha256});
+    }
+    // IndexedDB hashing is asynchronous; reject a stale snapshot if the game
+    // advanced while its legacy fields were being inspected.
+    if(canonical(slot,snapshotLocal(slot,storage))!==original)
+      throw Error('Career changed during migration; retry without advancing the game');
+    const result=await checkpoint(slot,entries);
+    const after=await readVerified(slot);
+    if(!after||after.source!=='head'||after.record.sha256!==result.sha256)
+      throw Error('Migrated career did not pass the post-commit verification');
+    await exportPortable(slot,validator);
+    if(canonical(slot,snapshotLocal(slot,storage))!==original)
+      throw Error('Career advanced during migration. Original was preserved; migrate again');
+    return Object.freeze({...result,alreadyMigrated:false,originalPreserved:true});
+  }
+  async function importPortable(slot,backup,validator){
+    requireSlot(slot);
+    const text=typeof backup==='string'?backup:JSON.stringify(backup);
+    if(typeof validator==='function')validator(text);
+    const decoded=JSON.parse(text);
+    if(!decoded||decoded.format!=='football-dynasty-restored-career'||
+       decoded.version!==1||!decoded.data||typeof decoded.data!=='object'||
+       Array.isArray(decoded.data))throw Error('Unsupported portable career backup');
+    const input=decoded.data,entries=Object.create(null);
+    for(const field of FIELDS){
+      if(field==='fd-shadow-prospects-v121i')continue;
+      const value=Object.hasOwn(input,field)?input[field]:null;
+      entries[field]=value===null?null:JSON.stringify(value);
+    }
+    const world=input['fd-world-state-v043'];
+    if(world?.shadowZip121i){
+      if(typeof world.shadowZip121i!=='string')throw Error('Invalid portable foreign academy data');
+      const zipped=world.shadowZip121i;
+      const converted={...world,shadowSidecar121i:true};
+      delete converted.shadowZip121i;
+      entries['fd-world-state-v043']=JSON.stringify(converted);
+      entries['fd-shadow-prospects-v121i']=JSON.stringify({format:'fd-shadow-sidecar-121i',zip:zipped});
+    }else{
+      entries['fd-shadow-prospects-v121i']=null;
+      if(world?.shadowSidecar121i)
+        throw Error('Portable backup is missing its foreign academy archive');
+    }
+    verifyLegacyPayload(slot,entries);
+    const result=await checkpoint(slot,entries);
+    await exportPortable(slot,validator);
+    return Object.freeze({...result,imported:true});
+  }
+  async function storageReport(storage=localStorage){
+    const localKeys=Object.keys(storage).filter(k=>k.startsWith('fd-save-'));
+    const legacyCharacters=localKeys.reduce((sum,key)=>sum+key.length+(storage.getItem(key)||'').length,0);
+    const slots=[];
+    for(let slot=1;slot<=5;slot++){
+      const verified=await readVerified(slot);
+      slots.push({slot,revision:verified?.record.revision||0,
+        recovered:!!verified?.recovered,source:verified?.source||'empty',
+        characters:verified?canonical(slot,verified.record.entries).length:0});
+    }
+    const estimate=await navigator.storage?.estimate?.().catch(()=>null);
+    return {legacyCharacters,slots,originUsageBytes:estimate?.usage??null,
+      originQuotaBytes:estimate?.quota??null};
+  }
   window.FDCareerVault124k=Object.freeze({open,checkpoint,checkpointLocal,readVerified,
-    snapshotLocal,exportPortable,clearSlot,clearAll,fields:FIELDS,version:1});
+    snapshotLocal,exportPortable,verifyLegacyPayload,migrateLegacy,importPortable,storageReport,
+    clearSlot,clearAll,fields:FIELDS,version:2});
 })();
