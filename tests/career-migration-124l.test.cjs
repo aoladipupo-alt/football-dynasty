@@ -91,6 +91,26 @@ async function main(){
   assert(migrated.youth&&migrated.roundtrip&&migrated.rejected);
   assert.equal(migrated.badVault,null);
   console.log('PASS raw + 1.24j compressed + shadow sidecar migrated intact; portable import roundtrip');
+  const rawLegacy=await page.evaluate(async()=>{
+   const vault=window.FDCareerVault124k,source=window.__fdStorageFixture;
+   const state={...source.raw,
+    'fd-manager-club-v1':JSON.stringify('legacy-plain-club'),
+    'fd-player-career-state-v1':JSON.stringify(source.players),
+    'fd-world-state-v043':JSON.stringify({year:2026,youth:[{id:'academy-0'}],
+     history:[{playerId:'player-1',from:'old',to:'new'}]}),
+    'fd-shadow-prospects-v121i':null};
+   const prior=JSON.stringify(state);
+   const storage={getItem(k){const m=/^fd-save-4-(.*)$/.exec(k);return m?state[m[1]]??null:null;}};
+   const result=await vault.migrateLegacy(4,storage);
+   const verified=await vault.readVerified(4);
+   const backedUp=await vault.exportPortable(4);
+   return {result,unchanged:JSON.stringify(state)===prior,
+     club:backedUp.data['fd-manager-club-v1'],playerCount:Object.keys(backedUp.data['fd-player-career-state-v1']).length,
+     hashMatches:verified.record.sha256===result.sha256};
+  });
+  assert(rawLegacy.unchanged&&rawLegacy.hashMatches&&rawLegacy.playerCount===1000);
+  assert.equal(rawLegacy.club,'legacy-plain-club');
+  console.log('PASS legacy uncompressed player saves migrate without modifying the original');
 
   // Continue seasons in both occupied slots. This is an IDB capacity/recovery
   // stress test: it does not call or replace the actual game simulation.
@@ -182,6 +202,18 @@ async function main(){
   assert(afterReload.report.slots.every(s=>s.revision===11));
   assert(afterReload.report.legacyCharacters>=0);
   assert(afterReload.report.slots[0].characters>0&&afterReload.report.slots[1].characters>0);
+  const denied=await context.newPage();
+  await denied.addInitScript(()=>Object.defineProperty(window,'indexedDB',
+   {value:undefined,configurable:true}));
+  await denied.goto(url,{waitUntil:'domcontentloaded',timeout:60000});
+  await denied.waitForFunction(()=>!!window.FDCareerVault124k);
+  const unavailable=await denied.evaluate(async()=>{
+   try{await window.FDCareerVault124k.open();return null;}
+   catch(error){return String(error?.message||error);}
+  });
+  assert.match(unavailable||'',/IndexedDB unavailable/);
+  await denied.close();
+  console.log('PASS IndexedDB denied: explicit failure with no fallback claim');
   assert.equal(errors.length,0,'Unexpected browser errors: '+errors.join(' | '));
   console.log('PASS durable reload invariants: '+JSON.stringify(afterReload.state));
   console.log('BENCHMARK '+JSON.stringify({viewport:'1366x768',coldStartupMs:coldMs,
