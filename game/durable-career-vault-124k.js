@@ -87,13 +87,18 @@
       tx.onerror=()=>{problem=problem||tx.error;};
       const request=store.get(slot+':head');
       request.onsuccess=()=>{
-        const current=request.result;
-        const actual=current?.revision||0;
-        if(actual!==expectedRevision || (current?.sha256||null)!==expectedHash){
-          problem=Error('Career checkpoint changed in another tab; nothing was overwritten');tx.abort();return;
+        try{
+          const current=request.result;
+          const actual=current?.revision||0;
+          if(actual!==expectedRevision || (current?.sha256||null)!==expectedHash){
+            throw Error('Career checkpoint changed in another tab; nothing was overwritten');
+          }
+          if(verifiedPrevious)store.put(verifiedPrevious,slot+':previous');
+          store.put(record,slot+':head');
+        }catch(error){
+          problem=error;
+          try{tx.abort();}catch(_){}
         }
-        if(verifiedPrevious)store.put(verifiedPrevious,slot+':previous');
-        store.put(record,slot+':head');
       };
       request.onerror=()=>{problem=request.error||Error('Unable to read checkpoint head');tx.abort();};
     });
