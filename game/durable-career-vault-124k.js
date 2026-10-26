@@ -28,7 +28,9 @@
   function open(){
     if(dbPromise)return dbPromise;
     dbPromise=new Promise((resolve,reject)=>{
-      if(!('indexedDB' in window)){reject(Error('IndexedDB unavailable; no data was changed'));return;}
+      if(!window.indexedDB||typeof window.indexedDB.open!=='function'){
+        reject(Error('IndexedDB unavailable; no data was changed'));return;
+      }
       const request=indexedDB.open(DATABASE,1);
       request.onupgradeneeded=()=>{
         const db=request.result;
