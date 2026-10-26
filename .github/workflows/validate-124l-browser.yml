@@ -1,0 +1,82 @@
+name: 1.24l IndexedDB Migration / Chromebook Browser Gate (No Deployment)
+
+on:
+  push:
+    branches: [work/1.24l-durable-save-migration]
+    paths:
+      - game/durable-career-vault-124k.js
+      - tests/career-migration-124l.test.cjs
+      - tests/career-vault-124k.test.cjs
+      - .github/workflows/validate-124l-browser.yml
+      - tools/build_124k_candidate.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build cumulative candidate without publishing
+        run: |
+          set -euo pipefail
+          python3 tools/build_124b_candidate.py
+          python3 tools/build_124d_candidate.py
+          python3 tools/build_124e_candidate.py
+          python3 tools/build_124f_candidate.py
+          python3 tools/build_124g_candidate.py
+          python3 tools/build_124h_candidate.py
+          python3 tools/build_124i_candidate.py
+          python3 tools/build_124j_candidate.py
+          python3 tools/build_124k_candidate.py
+      - name: Extract and verify candidate package
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          root=Path('_site').resolve()
+          with ZipFile('dist/football-dynasty-site-1.24k-vault-candidate.zip') as archive:
+              if archive.testzip():raise ValueError('ZIP CRC verification failed')
+              for item in archive.infolist():
+                  path=(root/item.filename).resolve()
+                  if not path.is_relative_to(root):raise ValueError('Unsafe ZIP member')
+                  if item.is_dir():path.mkdir(parents=True,exist_ok=True)
+                  else:
+                      path.parent.mkdir(parents=True,exist_ok=True)
+                      path.write_bytes(archive.read(item))
+          PY
+          python3 _site/scripts/verify-static-release.py
+      - name: Install disposable Chromium test harness
+        run: |
+          npm install --no-save --no-package-lock playwright-core@1.56.1
+          if ! command -v google-chrome && ! command -v google-chrome-stable && ! command -v chromium; then
+            npx --yes playwright@1.56.1 install chromium
+          fi
+      - name: Browser integration and interrupted-save injection
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory _site >/tmp/football-dynasty-test-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8765/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node --check game/durable-career-vault-124k.js
+          node --check tests/career-migration-124l.test.cjs
+          node tests/career-migration-124l.test.cjs
+          node tests/career-vault-124k.test.cjs
+          node tests/browser-career-124j.cjs
+      - name: Save test diagnostics (no deployment)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-dynasty-124l-dev-validation
+          path: |
+            /tmp/football-dynasty-test-server.log
+            dist/inspection-124j/candidate-manifest.json
+          if-no-files-found: ignore
+          retention-days: 7
