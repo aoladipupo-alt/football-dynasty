@@ -1,0 +1,25 @@
+name: Inspect Tactics XI Runtime (No Deployment)
+on:
+  push:
+    branches: [work/1.24m-larger-tactics-xi]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build candidate without deploying
+        run: |
+          python3 tools/build_124b_candidate.py
+          python3 tools/build_124d_candidate.py
+          python3 tools/build_124e_candidate.py
+          python3 tools/build_124f_candidate.py
+          python3 tools/build_124g_candidate.py
+          python3 tools/build_124h_candidate.py
+          python3 tools/build_124i_candidate.py
+          python3 tools/build_124j_candidate.py
+          python3 tools/build_124k_candidate.py
+      - name: Inspect packaged tactics layout
+        run: python3 tools/inspect_tactics_124m.py
