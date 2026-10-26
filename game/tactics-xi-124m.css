@@ -28,8 +28,8 @@ body .page-stage .tactics-pitch-card-063m .tactics-pitch-063m {
   display:block;
   width:100%;
   min-width:0 !important;
-  min-height:1110px !important;
-  height:1110px;
+  min-height:var(--fd-xi-height,1575px) !important;
+  height:var(--fd-xi-height,1575px);
   margin-inline:auto;
   overflow:visible;
 }
@@ -125,8 +125,8 @@ body .page-stage .tactics-squad-panel-063m .bench-player>div {
   }
   body .page-stage .tactics-pitch-card-063m .tactics-pitch-063m {
     min-width:760px !important;
-    min-height:940px !important;
-    height:940px;
+    min-height:var(--fd-xi-height,1575px) !important;
+    height:var(--fd-xi-height,1575px);
   }
   body .page-stage .tactics-pitch-063m .pitch-slot {
     width:128px;
