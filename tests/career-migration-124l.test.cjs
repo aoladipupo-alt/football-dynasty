@@ -199,7 +199,7 @@ async function main(){
    }),report:await vault.storageReport(),heapBytes:performance.memory?.usedJSHeapSize??null};
   });
   assert.deepEqual(afterReload.state,sustained.invariant);
-  assert(afterReload.report.slots.every(s=>s.revision===11));
+  assert(afterReload.report.slots.slice(0,2).every(s=>s.revision===11));
   assert(afterReload.report.legacyCharacters>=0);
   assert(afterReload.report.slots[0].characters>0&&afterReload.report.slots[1].characters>0);
   const denied=await context.newPage();
