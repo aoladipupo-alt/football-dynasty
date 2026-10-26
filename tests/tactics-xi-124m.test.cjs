@@ -79,6 +79,7 @@ async function main(){
   assert(metric.squad.top>=metric.pitch.bottom,
    'Squad panel still steals width from formation');
   assert(metric.overlapPairs.length===0,'XI player cards collide: '+JSON.stringify(metric.overlapPairs));
+  fs.mkdirSync('dist/qa-124m',{recursive:true});
   await updated.page.screenshot({path:'dist/qa-124m/tactics-desktop.png',fullPage:true});
   await updated.page.setViewportSize({width:800,height:768});
   const medium=await updated.page.evaluate(()=>{
