@@ -1,0 +1,150 @@
+/* Football Dynasty 1.24m — formation-first tactics layout.
+ * Presentation only: no changes to formation, save format, or squad assignments.
+ * Overrides the older two-column workspace and narrow 104px player cards.
+ */
+
+/* Let the entire XI own the main row. Squad/bench and team instructions stay
+   accessible underneath rather than squeezing the pitch into one narrow tile. */
+body .page-stage .tactics-layout-063m,
+body .page-stage .tactics-layout-063m .tactics-workspace-063m {
+  min-width:0;
+}
+body .page-stage .tactics-layout-063m .tactics-workspace-063m {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) !important;
+  align-items:start;
+  gap:16px;
+}
+body .page-stage .tactics-layout-063m .tactics-pitch-card-063m {
+  width:100%;
+  min-width:0;
+}
+body .page-stage .tactics-pitch-card-063m > .card-body {
+  padding:20px clamp(12px,2vw,28px) 24px;
+  overflow-x:visible;
+}
+body .page-stage .tactics-pitch-card-063m .tactics-pitch-063m {
+  box-sizing:border-box;
+  display:block;
+  width:100%;
+  min-width:0 !important;
+  min-height:1110px !important;
+  height:1110px;
+  margin-inline:auto;
+  overflow:visible;
+}
+body .page-stage .tactics-pitch-063m .pitch-slot {
+  box-sizing:border-box;
+  width:156px;
+  max-width:none;
+  z-index:1;
+}
+body .page-stage .tactics-pitch-063m .pitch-slot:hover,
+body .page-stage .tactics-pitch-063m .pitch-slot:focus-within {
+  z-index:5;
+}
+body .page-stage .tactics-pitch-063m .player-bubble.facecard {
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+  padding:10px 9px !important;
+  border-radius:13px;
+}
+body .page-stage .tactics-pitch-063m .pitch-slot .player-face-shell,
+body .page-stage .tactics-pitch-063m .pitch-slot .face-img,
+body .page-stage .tactics-pitch-063m .pitch-slot .face {
+  width:86px !important;
+  height:86px !important;
+  min-width:86px !important;
+  border-radius:11px !important;
+  object-fit:cover;
+}
+body .page-stage .tactics-pitch-063m .player-bubble.facecard strong {
+  font-size:12px !important;
+  line-height:1.2;
+  margin-top:5px;
+  text-overflow:ellipsis;
+}
+body .page-stage .tactics-pitch-063m .player-bubble.facecard small {
+  font-size:10px !important;
+  line-height:1.3;
+  margin-top:3px;
+}
+body .page-stage .tactics-pitch-063m .pitch-slot .slot-label {
+  font-size:11px;
+  line-height:1.3;
+  padding:3px 8px;
+}
+body .page-stage .tactics-pitch-063m .pitch-slot .role-picker {
+  display:block;
+  width:100%;
+  min-height:28px;
+  font-size:11px;
+  margin-top:5px;
+  padding:3px 7px;
+}
+body .page-stage .tactics-pitch-063m .pitch-slot .slot-picker {
+  min-height:26px;
+}
+body .page-stage .tactics-pitch-063m .pitch-slot .slot-picker:focus {
+  width:100%;
+  max-width:100%;
+}
+body .page-stage .tactics-squad-panel-063m {
+  width:100%;
+  min-width:0;
+}
+body .page-stage .tactics-squad-panel-063m .bench-tray {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+  gap:9px;
+}
+body .page-stage .tactics-squad-panel-063m .bench-player {
+  min-width:0;
+}
+body .page-stage .tactics-squad-panel-063m .bench-player>div {
+  min-width:0;
+}
+
+/* At lower laptop widths, preserve player-card legibility and offer an obvious
+   horizontal pan instead of squeezing cards or cutting off wide positions. */
+@media (max-width:1199px) {
+  body .page-stage .tactics-pitch-card-063m > .card-body {
+    overflow-x:auto !important;
+    overscroll-behavior-x:contain;
+  }
+  body .page-stage .tactics-pitch-card-063m .tactics-pitch-063m {
+    width:100%;
+    min-width:940px !important;
+  }
+}
+@media (max-width:720px) {
+  body .page-stage .tactics-pitch-card-063m > .card-body {
+    padding:10px 8px 16px;
+    overflow-x:auto !important;
+  }
+  body .page-stage .tactics-pitch-card-063m .tactics-pitch-063m {
+    min-width:760px !important;
+    min-height:940px !important;
+    height:940px;
+  }
+  body .page-stage .tactics-pitch-063m .pitch-slot {
+    width:128px;
+  }
+  body .page-stage .tactics-pitch-063m .pitch-slot .player-face-shell,
+  body .page-stage .tactics-pitch-063m .pitch-slot .face-img,
+  body .page-stage .tactics-pitch-063m .pitch-slot .face {
+    width:70px !important;
+    height:70px !important;
+    min-width:70px !important;
+  }
+  body .page-stage .tactics-pitch-063m .player-bubble.facecard strong {
+    font-size:11px !important;
+  }
+  body .page-stage .tactics-squad-panel-063m .bench-tray {
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  }
+}
+
+/* Respect narrow-height landscape displays: scroll to see the whole XI.
+   The cards must remain tappable and never be shrunk based on viewport height. */
