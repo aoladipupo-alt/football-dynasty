@@ -1,0 +1,77 @@
+name: 1.24m Larger Tactics XI - Real Chromium Layout (No Deployment)
+on:
+  push:
+    branches: [work/1.24m-larger-tactics-xi]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build cumulative baseline and UI-only candidate
+        run: |
+          set -euo pipefail
+          python3 tools/build_124b_candidate.py
+          python3 tools/build_124d_candidate.py
+          python3 tools/build_124e_candidate.py
+          python3 tools/build_124f_candidate.py
+          python3 tools/build_124g_candidate.py
+          python3 tools/build_124h_candidate.py
+          python3 tools/build_124i_candidate.py
+          python3 tools/build_124j_candidate.py
+          python3 tools/build_124k_candidate.py
+          python3 tools/build_124m_tactics_candidate.py
+      - name: Unpack and validate baseline and candidate manifests
+        run: |
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          for archive,target in [
+           ('dist/football-dynasty-site-1.24k-vault-candidate.zip','_site_baseline'),
+           ('dist/football-dynasty-site-1.24m-tactics-candidate.zip','_site')]:
+              root=Path(target).resolve()
+              with ZipFile(archive) as z:
+                  if z.testzip():raise RuntimeError('ZIP CRC failure')
+                  for item in z.infolist():
+                      out=(root/item.filename).resolve()
+                      if not out.is_relative_to(root):raise RuntimeError('Unsafe ZIP entry')
+                      if item.is_dir():out.mkdir(parents=True,exist_ok=True)
+                      else:
+                          out.parent.mkdir(parents=True,exist_ok=True)
+                          out.write_bytes(z.read(item))
+          PY
+          python3 _site_baseline/scripts/verify-static-release.py
+          python3 _site/scripts/verify-static-release.py
+      - name: Install browser harness
+        run: |
+          npm install --no-save --no-package-lock playwright-core@1.56.1
+          if ! command -v google-chrome && ! command -v chromium; then
+            npx --yes playwright@1.56.1 install chromium
+          fi
+      - name: Compare actual player card and pitch bounds
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory _site >/tmp/fd124m-new.log 2>&1 &
+          NEW_PID=$!
+          python3 -m http.server 8766 --bind 127.0.0.1 --directory _site_baseline >/tmp/fd124m-old.log 2>&1 &
+          OLD_PID=$!
+          trap 'kill $NEW_PID $OLD_PID || true' EXIT
+          for i in $(seq 1 35); do
+            if curl -fsS http://127.0.0.1:8765/game/index.html >/dev/null && curl -fsS http://127.0.0.1:8766/game/index.html >/dev/null; then break; fi
+            sleep 1
+          done
+          node --check tests/tactics-xi-124m.test.cjs
+          node tests/tactics-xi-124m.test.cjs
+      - name: Upload candidate and actual game screenshot (never deploy)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-dynasty-124m-layout-preview
+          path: |
+            dist/qa-124m/tactics-desktop.png
+            dist/football-dynasty-site-1.24m-tactics-candidate.zip
+          if-no-files-found: ignore
+          retention-days: 7
