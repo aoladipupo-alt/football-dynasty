@@ -24,8 +24,13 @@ async function loadTactics(browser,base,viewport){
   await page.locator('.club-grid [data-choose-club]').first().click();
   await page.locator('#mission-setup-start').click();
   await page.locator('.app-shell .topbar').waitFor({timeout:100000});
-  await page.locator('details.top-menu > summary').click();
-  await page.locator('button[data-shell-page="Tactics"]').click();
+  const links=await page.evaluate(()=>[...document.querySelectorAll('button,a,[role="button"]')]
+   .filter(x=>/tactic|squad|settings/i.test((x.textContent||'').trim()))
+   .slice(0,18).map(x=>({text:(x.textContent||'').trim().slice(0,70),
+     html:x.outerHTML.slice(0,260)})));
+  console.log('NAV CANDIDATES '+JSON.stringify(links));
+  const tacticsButton=page.getByRole('button',{name:/^tactics$/i}).first();
+  await tacticsButton.click({timeout:15000});
   await page.locator('.tactics-pitch-card-063m .tactics-pitch-063m').waitFor({timeout:90000});
   const metric=await page.evaluate(()=>{
    const pitch=document.querySelector('.tactics-pitch-card-063m .tactics-pitch-063m');
