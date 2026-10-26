@@ -9,6 +9,7 @@ import json
 PAGE='game/index.html'
 CSS='game/tactics-xi-124m.css'
 MANIFEST='hosting-manifest-123d.json'
+RUNTIME='game/runtime-096g.js'
 TAG='<link rel="stylesheet" href="tactics-xi-124m.css?v=124m" />'
 
 def digest(data):return hashlib.sha256(data).hexdigest()
@@ -29,17 +30,53 @@ def build(source,output):
         text=page.decode('utf8')
         if text.count('</head>')!=1 or TAG in text:raise ValueError('Unsafe HTML injection anchor')
         changed=(text.replace('</head>','  '+TAG+'\n</head>')).encode('utf8')
+
+        engine=old.read(RUNTIME)
+        if (manifest['assets'][RUNTIME]['bytes']!=len(engine) or
+            manifest['assets'][RUNTIME]['sha256']!=digest(engine)):
+            raise ValueError('Baseline runtime checksum mismatch')
+        runtime=engine.decode('utf8')
+        begin=runtime.index('    function pitchHtml(formation, assignments, pool, roles, rankings097e=null) {')
+        end=runtime.index('    function syncStarterSet063m(plan){',begin)
+        section=runtime[begin:end]
+        line='        const slots = FORMATIONS[formation];'
+        new_line="""        const slots = FORMATIONS[formation];
+        // 1.24m: space the display rows evenly without touching role or squad data.
+        const distinctYs=[...new Set(slots.map(row=>Number(row[3])))].sort((a,b)=>a-b);
+        const bands=[];
+        for(const y of distinctYs){
+            const last=bands[bands.length-1];
+            if(last&&y-last.max<=8){last.max=y;last.values.push(y);}
+            else bands.push({max:y,values:[y]});
+        }
+        const boardHeight124m=Math.max(1450,bands.length*315);
+        const placeY124m=y=>{
+            const i=bands.findIndex(row=>row.values.includes(Number(y)));
+            return bands.length<=1?50:10+80*i/(bands.length-1);
+        };"""
+        if section.count(line)!=1:raise ValueError('Unexpected pitch function layout')
+        section=section.replace(line,new_line)
+        pitch_open='<div class="pitch tactics-pitch tactics-pitch-063m">'
+        pitch_new='<div class="pitch tactics-pitch tactics-pitch-063m" style="--fd-xi-height:${boardHeight124m}px">'
+        if section.count(pitch_open)!=1:raise ValueError('No tactical pitch tag')
+        section=section.replace(pitch_open,pitch_new)
+        position_old='style="left:${x}%;top:${y}%"'
+        position_new='style="left:${x}%;top:${placeY124m(y)}%"'
+        if section.count(position_old)!=1:raise ValueError('No tactical pitch coordinates')
+        section=section.replace(position_old,position_new)
+        new_engine=(runtime[:begin]+section+runtime[end:]).encode('utf8')
+        manifest['assets'][RUNTIME].update(bytes=len(new_engine),sha256=digest(new_engine))
         manifest['assets'][PAGE].update(bytes=len(changed),sha256=digest(changed))
         manifest['assets'][CSS]={'minBytes':1000,'mime':'css',
                                  'bytes':len(css),'sha256':digest(css)}
-        replacements={PAGE:changed,MANIFEST:(json.dumps(manifest,indent=2)+'\n').encode()}
+        replacements={PAGE:changed,RUNTIME:new_engine,MANIFEST:(json.dumps(manifest,indent=2)+'\n').encode()}
         with ZipFile(output,'w') as new:
             for info in old.infolist():
                 new.writestr(info,replacements.get(info.filename,old.read(info)))
             new.writestr(CSS,css)
     with ZipFile(source) as old,ZipFile(output) as new:
         modified={p for p in old.namelist() if old.read(p)!=new.read(p)}
-        if modified!={PAGE,MANIFEST} or new.testzip() or len(new.namelist())!=len(names)+1:
+        if modified!={PAGE,MANIFEST,RUNTIME} or new.testzip() or len(new.namelist())!=len(names)+1:
             raise RuntimeError('Unexpected files changed: '+repr(modified))
     result={'new_css':CSS,'changed_entries':sorted(modified),'files':len(names)+1,
             'sha256':digest(output.read_bytes())}
