@@ -32,6 +32,8 @@ jobs:
           python3 tools/build_124i_candidate.py
           python3 tools/build_124j_candidate.py
           python3 tools/build_124k_candidate.py
+      - name: Inspect runtime save-path boundaries (bounded log)
+        run: python3 tools/inspect_storage_124l.py
       - name: Extract and verify candidate package
         run: |
           python3 - <<'PY'
